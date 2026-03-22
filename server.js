@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
+import { createClient } from "@libsql/client";
 import { readFileSync } from "fs";
 
 try {
@@ -20,10 +19,30 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const db = await open({ filename: "./soc_library.db", driver: sqlite3.Database });
+const db = createClient({
+  url: process.env.TURSO_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-await db.exec(`
-CREATE TABLE IF NOT EXISTS users (
+// ── DB helpers (libsql compat) ────────────────────────────────────────────
+
+async function dbRun(sql, args = []) {
+  return db.execute({ sql, args });
+}
+
+async function dbGet(sql, args = []) {
+  const res = await db.execute({ sql, args });
+  return res.rows[0] ?? null;
+}
+
+async function dbAll(sql, args = []) {
+  const res = await db.execute({ sql, args });
+  return res.rows;
+}
+
+// ── Schema ─────────────────────────────────────────────────────────────────
+
+await dbRun(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_type TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -31,10 +50,9 @@ CREATE TABLE IF NOT EXISTS users (
     employee_number TEXT UNIQUE,
     email TEXT NOT NULL UNIQUE,
     banned INTEGER DEFAULT 0
-);`);
+)`);
 
-await db.exec(`
-CREATE TABLE IF NOT EXISTS books (
+await dbRun(`CREATE TABLE IF NOT EXISTS books (
     book_code TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     author TEXT NOT NULL,
@@ -43,10 +61,9 @@ CREATE TABLE IF NOT EXISTS books (
     stock INTEGER DEFAULT 1,
     available INTEGER DEFAULT 1,
     dewey_decimal TEXT
-);`);
+)`);
 
-await db.exec(`
-CREATE TABLE IF NOT EXISTS borrow_records (
+await dbRun(`CREATE TABLE IF NOT EXISTS borrow_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     book_code TEXT,
     user_id INTEGER,
@@ -56,27 +73,26 @@ CREATE TABLE IF NOT EXISTS borrow_records (
     fee_paid INTEGER DEFAULT 0,
     FOREIGN KEY (book_code) REFERENCES books(book_code),
     FOREIGN KEY (user_id) REFERENCES users(id)
-);`);
+)`);
 
-await db.exec(`
-CREATE TABLE IF NOT EXISTS audit_log (
+await dbRun(`CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     actor_id INTEGER,
     actor_name TEXT,
     action TEXT NOT NULL,
     detail TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-);`);
+)`);
 
 // Migrations
-try { await db.exec(`ALTER TABLE books ADD COLUMN stock INTEGER DEFAULT 1`); } catch {}
-try { await db.exec(`ALTER TABLE borrow_records ADD COLUMN fee_paid INTEGER DEFAULT 0`); } catch {}
-try { await db.exec(`ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0`); } catch {}
+try { await dbRun(`ALTER TABLE books ADD COLUMN stock INTEGER DEFAULT 1`); } catch {}
+try { await dbRun(`ALTER TABLE borrow_records ADD COLUMN fee_paid INTEGER DEFAULT 0`); } catch {}
+try { await dbRun(`ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0`); } catch {}
 
 // Seed books only if table is empty
-const bookCount = await db.get("SELECT COUNT(*) as c FROM books");
+const bookCount = await dbGet("SELECT COUNT(*) as c FROM books");
 if (bookCount.c === 0) {
-  await db.exec(`
+  await dbRun(`
   INSERT INTO books (book_code, title, author, year, category, stock, available, dewey_decimal) VALUES
   ('SB-001', 'Noli Me Tángere', 'José Rizal', 1887, 'Storybooks', 7, 7, '899.211'),
   ('SB-002', 'Ilustrado', 'Miguel Syjuco', 2008, 'Storybooks', 12, 12, '823.92'),
@@ -143,9 +159,9 @@ if (bookCount.c === 0) {
 }
 
 // Seed users only if table is empty
-const userCount = await db.get("SELECT COUNT(*) as c FROM users");
+const userCount = await dbGet("SELECT COUNT(*) as c FROM users");
 if (userCount.c === 0) {
-  await db.exec(`
+  await dbRun(`
   INSERT INTO users (user_type, name, student_number, employee_number, email) VALUES
   ('student', 'Juan Dela Cruz', 'S10101', NULL, 'juan.dela.cruz@school.edu.ph'),
   ('student', 'Maria Santos', 'S10102', NULL, 'maria.santos@school.edu.ph'),
@@ -187,45 +203,38 @@ async function resolvePrefix(category) {
 
   const base = basePrefixFromName(category);
 
-  // Check all existing prefixes in use
-  const rows = await db.all("SELECT DISTINCT book_code FROM books");
-  const usedPrefixes = new Map(); // prefix -> category
+  const rows = await dbAll("SELECT DISTINCT book_code FROM books");
+  const usedPrefixes = new Map();
 
-  // Also check known prefixes
   for (const [cat, pfx] of Object.entries(KNOWN_PREFIXES)) {
     usedPrefixes.set(pfx, cat);
   }
   for (const row of rows) {
     const pfx = row.book_code.split("-")[0];
-    // find which category uses this prefix
-    const catRow = await db.get("SELECT category FROM books WHERE book_code=?", [row.book_code]);
+    const catRow = await dbGet("SELECT category FROM books WHERE book_code=?", [row.book_code]);
     if (catRow) usedPrefixes.set(pfx, catRow.category);
   }
 
-  // If base is free or already used by this same category, use it
   if (!usedPrefixes.has(base) || usedPrefixes.get(base) === category) return base;
 
-  // Otherwise find next available: BT2, BT3, ...
   let n = 2;
   while (usedPrefixes.has(`${base}${n}`) && usedPrefixes.get(`${base}${n}`) !== category) n++;
   return `${base}${n}`;
 }
 
-// Generate next book code for a given prefix
 async function nextBookCode(prefix) {
-  const rows = await db.all("SELECT book_code FROM books WHERE book_code LIKE ?", [`${prefix}-%`]);
+  const rows = await dbAll("SELECT book_code FROM books WHERE book_code LIKE ?", [`${prefix}-%`]);
   const nums = rows.map(r => {
     const part = r.book_code.split("-")[1];
     return parseInt(part, 10);
   }).filter(n => !isNaN(n));
   const next = nums.length ? Math.max(...nums) + 1 : 1;
-  // Dynamic digit width: at least 3, grows as needed
   const digits = Math.max(3, String(next).length);
   return `${prefix}-${String(next).padStart(digits, "0")}`;
 }
 
 async function logAction(actorId, actorName, action, detail) {
-  await db.run(
+  await dbRun(
     "INSERT INTO audit_log(actor_id, actor_name, action, detail) VALUES(?,?,?,?)",
     [actorId, actorName, action, detail]
   );
@@ -244,15 +253,15 @@ app.post("/login", async (req, res) => {
   let user;
   if (user_type === "student") {
     if (!student_number) return res.status(400).json({ error: "Student Number required" });
-    user = await db.get("SELECT * FROM users WHERE user_type='student' AND student_number=? AND email=?", [student_number, email]);
+    user = await dbGet("SELECT * FROM users WHERE user_type='student' AND student_number=? AND email=?", [student_number, email]);
     if (!user) return res.status(401).json({ error: "Invalid student number or email." });
   } else if (user_type === "teacher") {
     if (!employee_number) return res.status(400).json({ error: "Employee Number required" });
-    user = await db.get("SELECT * FROM users WHERE user_type='teacher' AND employee_number=? AND email=?", [employee_number, email]);
+    user = await dbGet("SELECT * FROM users WHERE user_type='teacher' AND employee_number=? AND email=?", [employee_number, email]);
     if (!user) return res.status(401).json({ error: "Invalid employee number or email." });
   } else if (user_type === "admin") {
     if (!employee_number) return res.status(400).json({ error: "Employee Number required" });
-    user = await db.get("SELECT * FROM users WHERE user_type='admin' AND employee_number=? AND email=?", [employee_number, email]);
+    user = await dbGet("SELECT * FROM users WHERE user_type='admin' AND employee_number=? AND email=?", [employee_number, email]);
     if (!user) return res.status(401).json({ error: "Invalid employee number or email." });
   } else return res.status(400).json({ error: "Invalid user type" });
 
@@ -264,20 +273,19 @@ app.post("/login", async (req, res) => {
 // ── Books ──────────────────────────────────────────────────────────────────
 
 app.get("/books", async (req, res) => {
-  res.json(await db.all("SELECT * FROM books ORDER BY book_code ASC"));
+  res.json(await dbAll("SELECT * FROM books ORDER BY book_code ASC"));
 });
 
 app.get("/books/:book_code", async (req, res) => {
-  const book = await db.get("SELECT * FROM books WHERE book_code=?", [req.params.book_code]);
+  const book = await dbGet("SELECT * FROM books WHERE book_code=?", [req.params.book_code]);
   if (!book) return res.status(404).json({ error: "Book not found" });
   res.json(book);
 });
 
-// Preview prefix for a category (used by frontend before confirming new category)
 app.get("/books/preview-prefix", async (req, res) => {
   const { category } = req.query;
   if (!category) return res.status(400).json({ error: "category required" });
-  const isNew = !KNOWN_PREFIXES[category] && !(await db.get("SELECT 1 FROM books WHERE category=?", [category]));
+  const isNew = !KNOWN_PREFIXES[category] && !(await dbGet("SELECT 1 FROM books WHERE category=?", [category]));
   const prefix = await resolvePrefix(category);
   res.json({ prefix, isNew });
 });
@@ -286,47 +294,46 @@ app.post("/books", async (req, res) => {
   const { title, author, year, category, dewey_decimal, stock, actor_id, actor_name } = req.body;
   if (!title || !author || !year || !category) return res.status(400).json({ error: "Fill all fields" });
 
-  const exists = await db.get("SELECT * FROM books WHERE title=? AND author=?", [title, author]);
+  const exists = await dbGet("SELECT * FROM books WHERE title=? AND author=?", [title, author]);
   if (exists) return res.status(400).json({ error: "Book already exists" });
 
   const prefix = await resolvePrefix(category);
   const book_code = await nextBookCode(prefix);
   const stockVal = Math.min(9999, parseInt(stock) || 1);
 
-  await db.run(
+  await dbRun(
     "INSERT INTO books(book_code, title, author, year, category, stock, available, dewey_decimal) VALUES(?,?,?,?,?,?,?,?)",
     [book_code, title, author, year, category, stockVal, stockVal, dewey_decimal || null]
   );
 
   await logAction(actor_id, actor_name, "ADD_BOOK", `Added book "${title}" (${book_code}), category: ${category}`);
-
-  res.json(await db.get("SELECT * FROM books WHERE book_code=?", [book_code]));
+  res.json(await dbGet("SELECT * FROM books WHERE book_code=?", [book_code]));
 });
 
 app.put("/books/:book_code", async (req, res) => {
   const { book_code } = req.params;
   const { title, author, year, category, dewey_decimal, stock, actor_id, actor_name } = req.body;
-  const book = await db.get("SELECT * FROM books WHERE book_code=?", [book_code]);
+  const book = await dbGet("SELECT * FROM books WHERE book_code=?", [book_code]);
   if (!book) return res.status(404).json({ error: "Book not found" });
 
   const stockVal = Math.min(9999, parseInt(stock) || book.stock);
   const borrowed = book.stock - book.available;
   const newAvailable = Math.max(0, stockVal - borrowed);
 
-  await db.run(
+  await dbRun(
     "UPDATE books SET title=?, author=?, year=?, category=?, dewey_decimal=?, stock=?, available=? WHERE book_code=?",
     [title, author, year, category, dewey_decimal || null, stockVal, newAvailable, book_code]
   );
 
   await logAction(actor_id, actor_name, "EDIT_BOOK", `Edited book ${book_code}: "${title}"`);
-  res.json(await db.get("SELECT * FROM books WHERE book_code=?", [book_code]));
+  res.json(await dbGet("SELECT * FROM books WHERE book_code=?", [book_code]));
 });
 
 app.delete("/books/:book_code", async (req, res) => {
   const { actor_id, actor_name } = req.body;
-  const book = await db.get("SELECT * FROM books WHERE book_code=?", [req.params.book_code]);
+  const book = await dbGet("SELECT * FROM books WHERE book_code=?", [req.params.book_code]);
   if (!book) return res.status(404).json({ error: "Book not found" });
-  await db.run("DELETE FROM books WHERE book_code=?", [req.params.book_code]);
+  await dbRun("DELETE FROM books WHERE book_code=?", [req.params.book_code]);
   await logAction(actor_id, actor_name, "DELETE_BOOK", `Deleted book ${req.params.book_code}: "${book.title}"`);
   res.json({ success: true });
 });
@@ -335,59 +342,59 @@ app.delete("/books/:book_code", async (req, res) => {
 
 app.post("/borrow", async (req, res) => {
   const { book_code, user_id, due_date } = req.body;
-  const book = await db.get("SELECT * FROM books WHERE book_code=?", [book_code]);
+  const book = await dbGet("SELECT * FROM books WHERE book_code=?", [book_code]);
   if (!book) return res.status(404).json({ error: "Book not found" });
   if (book.available <= 0) return res.status(400).json({ error: "No available copies" });
 
-  const existing = await db.get(
+  const existing = await dbGet(
     "SELECT * FROM borrow_records WHERE book_code=? AND user_id=? AND return_date IS NULL",
     [book_code, user_id]
   );
   if (existing) return res.status(400).json({ error: "You already have this book borrowed" });
 
-  await db.run("UPDATE books SET available=available-1 WHERE book_code=?", [book_code]);
-  await db.run("INSERT INTO borrow_records(book_code, user_id, due_date) VALUES(?,?,?)", [book_code, user_id, due_date]);
+  await dbRun("UPDATE books SET available=available-1 WHERE book_code=?", [book_code]);
+  await dbRun("INSERT INTO borrow_records(book_code, user_id, due_date) VALUES(?,?,?)", [book_code, user_id, due_date]);
 
-  const user = await db.get("SELECT name FROM users WHERE id=?", [user_id]);
+  const user = await dbGet("SELECT name FROM users WHERE id=?", [user_id]);
   await logAction(user_id, user?.name, "BORROW_BOOK", `Borrowed "${book.title}" (${book_code}), due: ${due_date}`);
   res.json({ success: true });
 });
 
 app.post("/return", async (req, res) => {
   const { book_code, user_id, return_date } = req.body;
-  const record = await db.get(
+  const record = await dbGet(
     "SELECT * FROM borrow_records WHERE book_code=? AND user_id=? AND return_date IS NULL ORDER BY borrow_date DESC LIMIT 1",
     [book_code, user_id]
   );
   if (!record) return res.status(400).json({ error: "No active borrow record found" });
 
   const finalDate = return_date || new Date().toISOString().split("T")[0];
-  await db.run("UPDATE borrow_records SET return_date=? WHERE id=?", [finalDate, record.id]);
-  await db.run("UPDATE books SET available=available+1 WHERE book_code=?", [book_code]);
+  await dbRun("UPDATE borrow_records SET return_date=? WHERE id=?", [finalDate, record.id]);
+  await dbRun("UPDATE books SET available=available+1 WHERE book_code=?", [book_code]);
 
-  const book = await db.get("SELECT title FROM books WHERE book_code=?", [book_code]);
-  const user = await db.get("SELECT name FROM users WHERE id=?", [user_id]);
+  const book = await dbGet("SELECT title FROM books WHERE book_code=?", [book_code]);
+  const user = await dbGet("SELECT name FROM users WHERE id=?", [user_id]);
   await logAction(user_id, user?.name, "RETURN_BOOK", `Returned "${book?.title}" (${book_code}) on ${finalDate}`);
   res.json({ success: true });
 });
 
 app.get("/borrow_records", async (req, res) => {
   const { book_code, user_id } = req.query;
-  res.json(await db.all(
+  res.json(await dbAll(
     "SELECT * FROM borrow_records WHERE book_code=? AND user_id=? AND return_date IS NULL ORDER BY borrow_date DESC",
     [book_code, user_id]
   ));
 });
 
 app.get("/borrows/active/user/:id", async (req, res) => {
-  res.json(await db.all(
+  res.json(await dbAll(
     "SELECT book_code FROM borrow_records WHERE user_id=? AND return_date IS NULL",
     [req.params.id]
   ));
 });
 
 app.get("/borrows/active", async (req, res) => {
-  res.json(await db.all(`
+  res.json(await dbAll(`
     SELECT br.*, b.title, u.name, u.user_type, u.student_number, u.employee_number, u.email
     FROM borrow_records br
     JOIN books b ON br.book_code = b.book_code
@@ -403,20 +410,20 @@ app.get("/users/search", async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
   const like = `%${q}%`;
-  res.json(await db.all(
+  res.json(await dbAll(
     "SELECT * FROM users WHERE (email LIKE ? OR student_number LIKE ? OR employee_number LIKE ?) ORDER BY name ASC",
     [like, like, like]
   ));
 });
 
 app.get("/users/:id", async (req, res) => {
-  const user = await db.get("SELECT * FROM users WHERE id=?", [req.params.id]);
+  const user = await dbGet("SELECT * FROM users WHERE id=?", [req.params.id]);
   if (!user) return res.status(404).json({ error: "User not found" });
   res.json(user);
 });
 
 app.get("/users/:id/borrows", async (req, res) => {
-  res.json(await db.all(`
+  res.json(await dbAll(`
     SELECT br.*, b.title, b.category
     FROM borrow_records br
     JOIN books b ON br.book_code = b.book_code
@@ -426,24 +433,24 @@ app.get("/users/:id/borrows", async (req, res) => {
 });
 
 app.post("/users/:id/borrows/:borrow_id/pay", async (req, res) => {
-  await db.run("UPDATE borrow_records SET fee_paid=1 WHERE id=? AND user_id=?", [req.params.borrow_id, req.params.id]);
+  await dbRun("UPDATE borrow_records SET fee_paid=1 WHERE id=? AND user_id=?", [req.params.borrow_id, req.params.id]);
   res.json({ success: true });
 });
 
 app.post("/users/:id/ban", async (req, res) => {
   const { actor_id, actor_name } = req.body;
-  const user = await db.get("SELECT * FROM users WHERE id=?", [req.params.id]);
+  const user = await dbGet("SELECT * FROM users WHERE id=?", [req.params.id]);
   if (!user) return res.status(404).json({ error: "User not found" });
-  await db.run("UPDATE users SET banned=1 WHERE id=?", [req.params.id]);
+  await dbRun("UPDATE users SET banned=1 WHERE id=?", [req.params.id]);
   await logAction(actor_id, actor_name, "BAN_USER", `Banned user "${user.name}" (${user.email})`);
   res.json({ success: true });
 });
 
 app.post("/users/:id/unban", async (req, res) => {
   const { actor_id, actor_name } = req.body;
-  const user = await db.get("SELECT * FROM users WHERE id=?", [req.params.id]);
+  const user = await dbGet("SELECT * FROM users WHERE id=?", [req.params.id]);
   if (!user) return res.status(404).json({ error: "User not found" });
-  await db.run("UPDATE users SET banned=0 WHERE id=?", [req.params.id]);
+  await dbRun("UPDATE users SET banned=0 WHERE id=?", [req.params.id]);
   await logAction(actor_id, actor_name, "UNBAN_USER", `Unbanned user "${user.name}" (${user.email})`);
   res.json({ success: true });
 });
@@ -455,37 +462,36 @@ app.post("/users", async (req, res) => {
   if (user_type === "student" && !student_number) return res.status(400).json({ error: "Student number required" });
   if (user_type !== "student" && !employee_number) return res.status(400).json({ error: "Employee number required" });
 
-  const existingEmail = await db.get("SELECT id FROM users WHERE email=?", [email]);
+  const existingEmail = await dbGet("SELECT id FROM users WHERE email=?", [email]);
   if (existingEmail) return res.status(400).json({ error: "Email already registered" });
 
   if (student_number) {
-    const existingNum = await db.get("SELECT id FROM users WHERE student_number=?", [student_number]);
+    const existingNum = await dbGet("SELECT id FROM users WHERE student_number=?", [student_number]);
     if (existingNum) return res.status(400).json({ error: "Student number already registered" });
   }
   if (employee_number) {
-    const existingNum = await db.get("SELECT id FROM users WHERE employee_number=?", [employee_number]);
+    const existingNum = await dbGet("SELECT id FROM users WHERE employee_number=?", [employee_number]);
     if (existingNum) return res.status(400).json({ error: "Employee number already registered" });
   }
 
-  await db.run(
+  await dbRun(
     "INSERT INTO users(user_type, name, student_number, employee_number, email) VALUES(?,?,?,?,?)",
     [user_type, name.trim(), student_number || null, employee_number || null, email]
   );
 
-  const newUser = await db.get("SELECT * FROM users WHERE email=?", [email]);
+  const newUser = await dbGet("SELECT * FROM users WHERE email=?", [email]);
   await logAction(actor_id, actor_name, "ADD_USER", `Added user "${name}" (${user_type}, ${email})`);
   res.json(newUser);
 });
 
-// ── Audit Log ──────────────────────────────────────────────────────────────
+// ── Audit Log ────────────────────────────────────────────────────────────
 
 app.get("/audit-log", async (req, res) => {
-  const rows = await db.all("SELECT * FROM audit_log ORDER BY timestamp DESC");
-  res.json(rows);
+  res.json(await dbAll("SELECT * FROM audit_log ORDER BY timestamp DESC"));
 });
 
 app.get("/audit-log/download", async (req, res) => {
-  const rows = await db.all("SELECT * FROM audit_log ORDER BY timestamp ASC");
+  const rows = await dbAll("SELECT * FROM audit_log ORDER BY timestamp ASC");
   const lines = [
     "ID,Timestamp,Actor,Action,Detail",
     ...rows.map(r =>
