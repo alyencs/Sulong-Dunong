@@ -417,8 +417,9 @@ tr:hover td { background: #fff4ed; transition: background 0.15s; }
 tr.selected td { background: #1B1B1B !important; color: #fff; }
 
 .badge { padding: 3px 8px; border-radius: 20px; font-weight: 700; font-size: 12px; display: inline-block; text-align: center; line-height: 1.4; }
-.available   { background: #e8f5e9; color: #2e7d32; }
-.unavailable { background: #fff3e0; color: #e65100; }
+.available      { background: #e8f5e9; color: #2e7d32; }
+.unavailable    { background: #fdecea; color: #c62828; }
+.status-borrowed { background: #fff3e0; color: #e65100; }
 .stock-high  { background: #e8f5e9; color: #2e7d32; }
 .stock-mid   { background: #fff3e0; color: #e65100; }
 .stock-low   { background: #fdecea; color: #c62828; }

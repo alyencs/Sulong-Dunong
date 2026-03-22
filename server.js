@@ -379,6 +379,13 @@ app.get("/borrow_records", async (req, res) => {
   ));
 });
 
+app.get("/borrows/active/user/:id", async (req, res) => {
+  res.json(await db.all(
+    "SELECT book_code FROM borrow_records WHERE user_id=? AND return_date IS NULL",
+    [req.params.id]
+  ));
+});
+
 app.get("/borrows/active", async (req, res) => {
   res.json(await db.all(`
     SELECT br.*, b.title, u.name, u.user_type, u.student_number, u.employee_number, u.email

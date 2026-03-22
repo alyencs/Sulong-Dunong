@@ -8,12 +8,20 @@ let sortState = [];
 const FEE_PER_DAY = 20;
 let bulkMode = false;
 let bulkSelected = new Set();
+let myBorrowedCodes = new Set();
 
 // ── Books: Load ────────────────────────────────────────────────────────────
 
 async function loadBooks() {
-    const res = await fetch("/books");
-    allBooks = await res.json();
+    const [booksRes, myBorrowsRes] = await Promise.all([
+        fetch("/books"),
+        currentUser ? fetch(`/borrows/active/user/${currentUser.id}`) : Promise.resolve(null)
+    ]);
+    allBooks = await booksRes.json();
+    if (myBorrowsRes) {
+        const myBorrows = await myBorrowsRes.json();
+        myBorrowedCodes = new Set(myBorrows.map(r => r.book_code));
+    }
     currentPage = 1;
     renderTable();
 }
@@ -33,8 +41,17 @@ function getSortedBooks(books) {
     if (!sortState.length) return books;
     return [...books].sort((a, b) => {
         for (const { col, dir } of sortState) {
-            let va = col === "status" ? (a.available > 0 ? "Available" : "Borrowed") : (a[col] ?? "");
-            let vb = col === "status" ? (b.available > 0 ? "Available" : "Borrowed") : (b[col] ?? "");
+            const isAdmin = currentUser?.role === "admin";
+            let va, vb;
+            if (col === "status") {
+                const statusOf = (b) => {
+                    if (isAdmin) return b.available === 0 ? "Unavailable" : b.available < b.stock ? "Borrowed" : "Available";
+                    return myBorrowedCodes.has(b.book_code) ? "Borrowed" : b.available === 0 ? "Unavailable" : "Available";
+                };
+                va = statusOf(a); vb = statusOf(b);
+            } else {
+                va = a[col] ?? ""; vb = b[col] ?? "";
+            }
             if (!isNaN(Number(va)) && !isNaN(Number(vb))) {
                 va = Number(va); vb = Number(vb);
             } else {
@@ -100,15 +117,27 @@ function renderTable() {
         row.id = `row-${book.book_code}`;
         if (selectedBookCode === book.book_code) row.classList.add("selected");
 
-        const statusBadge = `<span class="badge ${avail ? "available" : "unavailable"}">${avail ? "Available" : "Borrowed"}</span>`;
-        const stockClass = book.stock >= 5 ? "stock-high" : book.stock >= 2 ? "stock-mid" : "stock-low";
-        const stockBadge = `<span class="badge ${stockClass}">${book.stock}</span>`;
+        const borrowed = book.stock - book.available;
+        const iHaveit = myBorrowedCodes.has(book.book_code);
+        let statusLabel, statusClass;
+        if (iHaveit)                    { statusLabel = "Borrowed";    statusClass = "status-borrowed"; }
+        else if (book.available === 0)  { statusLabel = "Unavailable"; statusClass = "unavailable"; }
+        else                            { statusLabel = "Available";   statusClass = "available"; }
+        // Admin always uses objective state
+        let adminStatusLabel, adminStatusClass;
+        if (book.available === 0)       { adminStatusLabel = "Unavailable"; adminStatusClass = "unavailable"; }
+        else if (borrowed > 0)          { adminStatusLabel = "Borrowed";    adminStatusClass = "status-borrowed"; }
+        else                            { adminStatusLabel = "Available";   adminStatusClass = "available"; }
+        const statusBadge = isAdmin
+            ? `<span class="badge ${adminStatusClass}">${adminStatusLabel}</span>`
+            : `<span class="badge ${statusClass}">${statusLabel}</span>`;
+        const availCount = book.available;
+        const stockClass = availCount >= 5 ? "stock-high" : availCount >= 2 ? "stock-mid" : "stock-low";
+        const stockBadge = `<span class="badge ${stockClass}">${availCount}</span>`;
 
         let borrowedByCell = "";
-        if (isAdmin && !avail) {
-            const borrowed = book.stock - book.available;
+        if (isAdmin && borrowed > 0) {
             if (borrowed === 1) {
-                // find the single borrower number from active borrows cache if available
                 borrowedByCell = `<span class="borrowed-by-label">Borrowed by <a href="#" class="borrowed-by-link" onclick="showBorrowersForBook('${book.book_code}',${book.stock}); return false;" id="bbl-${book.book_code}">loading…</a></span>`;
             } else {
                 borrowedByCell = `<span class="borrowed-by-label"><a href="#" class="borrowed-by-link" onclick="showBorrowersForBook('${book.book_code}',${book.stock}); return false;">Check who borrowed</a></span>`;
