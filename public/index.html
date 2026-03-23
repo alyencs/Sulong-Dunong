@@ -6,19 +6,25 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="login-page">
+    <!-- DEBUG: Check browser console and Network tab for all errors -->
+    <!-- DEBUG: Three separate login forms are toggled via toggleForm() -->
 
     <div class="login-card">
         <div class="login-left">
+            <!-- DEBUG: If image not visible, check if login.jpg exists in public/ folder -->
             <img src="login.jpg" alt="Library" class="login-panel-img">
         </div>
 
         <div class="login-right">
+            <!-- DEBUG: Logo.png should exist in public/ folder -->
             <img src="logo.png" alt="Logo" class="login-logo">
             <h2>SULONG DUNONG</h2>
             <p class="login-subtitle">Welcome - Let's get started!</p>
             <hr class="login-divider">
 
-            <!-- Student Form -->
+            <!-- STUDENT LOGIN FORM (shown by default) -->
+            <!-- DEBUG: Form fields: student_number, login_email_student -->
+            <!-- DEBUG: Email must match domain defined in server.js SCHOOL_EMAIL_DOMAIN -->
             <div id="studentForm">
                 <div class="login-field">
                     <label>Student Number</label>
@@ -29,6 +35,7 @@
                     <input type="email" id="login_email_student" placeholder="Enter your institutional email">
                 </div>
                 <button class="btn-login" onclick="login('student')">Sign In</button>
+                <!-- DEBUG: toggleForm() switches visibility between student/teacher/admin forms -->
                 <p class="login-switch">
                     Staff member?
                     <a onclick="toggleForm('teacher')">Log In as Teacher</a> &nbsp;·&nbsp;
@@ -36,7 +43,9 @@
                 </p>
             </div>
 
-            <!-- Teacher Form -->
+            <!-- TEACHER LOGIN FORM (initially hidden) -->
+            <!-- DEBUG: Form fields: employee_number_teacher, login_email_teacher -->
+            <!-- DEBUG: Hidden until toggleForm('teacher') is clicked -->
             <div id="teacherForm" style="display:none;">
                 <div class="login-field">
                     <label>Employee Number</label>
@@ -53,7 +62,9 @@
                 </p>
             </div>
 
-            <!-- Admin Form -->
+            <!-- ADMIN LOGIN FORM (initially hidden) -->
+            <!-- DEBUG: Form fields: employee_number_admin, login_email_admin -->
+            <!-- DEBUG: Hidden until toggleForm('admin') is clicked -->
             <div id="adminForm" style="display:none;">
                 <div class="login-field">
                     <label>Employee Number</label>
@@ -72,55 +83,86 @@
         </div>
     </div>
 
+    <!-- ERROR MESSAGE TOAST -->
+    <!-- DEBUG: Login errors display here. Check showLoginError() in script for messages -->
     <div id="loginToast" class="login-toast"></div>
 
     <script>
+        // DEBUG: Timer for hiding error toasts after 4 seconds
         let _loginToastTimer = null;
 
+        // FORM SWITCHING
+        // DEBUG: Each form is shown/hidden based on userType parameter
+        // DEBUG: Only one form should be visible at a time
         function toggleForm(type) {
+            // DEBUG: Inspect with DevTools to verify forms toggle correctly
             document.getElementById("studentForm").style.display = type === "student" ? "block" : "none";
             document.getElementById("teacherForm").style.display = type === "teacher" ? "block" : "none";
             document.getElementById("adminForm").style.display   = type === "admin"   ? "block" : "none";
         }
 
+        // ERROR DISPLAY
+        // DEBUG: Shows error messages at bottom of page for 4 seconds
         function showLoginError(msg) {
             const el = document.getElementById("loginToast");
-            el.textContent = msg;
-            el.classList.add("login-toast-show");
+            el.textContent = msg;  // DEBUG: Set error message text
+            el.classList.add("login-toast-show");  // DEBUG: Make visible via CSS class
             clearTimeout(_loginToastTimer);
+            // DEBUG: Auto-hide after 4 seconds
             _loginToastTimer = setTimeout(() => el.classList.remove("login-toast-show"), 4000);
         }
 
-        function clearLoginError() {}
+        function clearLoginError() {
+            // DEBUG: Placeholder function currently unused
+        }
 
+        // MAIN LOGIN FUNCTION
+        // DEBUG: Validates form fields and sends POST to /login endpoint
         async function login(userType) {
             clearLoginError();
+            
+            // DEBUG: Determine correct email input field ID based on user type
             const emailId = userType === "student" ? "login_email_student"
                           : userType === "teacher" ? "login_email_teacher"
                           : "login_email_admin";
             const email = document.getElementById(emailId).value.trim();
+            // DEBUG: If email is undefined, check console - input ID may be wrong
 
+            // DEBUG: Get student/employee number based on user type
             const student_number  = userType === "student" ? document.getElementById("student_number").value.trim() : null;
             const employee_number = userType === "teacher" ? document.getElementById("employee_number_teacher").value.trim()
                                   : userType === "admin"   ? document.getElementById("employee_number_admin").value.trim()
                                   : null;
 
+            // DEBUG: Validate that all required fields are filled before sending request
             if (!email || (userType === "student" && !student_number) || (userType !== "student" && !employee_number)) {
                 showLoginError("All fields are required.");
+                // DEBUG: If validation error shows, verify all form fields are completed
                 return;
             }
 
+            // DEBUG: Send login request to server at /login endpoint
+            // DEBUG: Use Network tab in DevTools to inspect request/response
+            // DEBUG: If fetch hangs or 404s, verify server.js is running and has /login route
             const res = await fetch("/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_type: userType, student_number, employee_number, email })
             });
 
+            // DEBUG: Parse server response - check Network tab if JSON parse fails
             const data = await res.json();
             if (res.ok) {
+                // DEBUG: Success - server returned user data
+                // DEBUG: Storing user in sessionStorage so admin.html and library.html can access it
                 sessionStorage.setItem("currentUser", JSON.stringify(data));
+                // DEBUG: Redirect to admin.html for admins, library.html for students/teachers
+                // DEBUG: If redirect doesn't happen, check console for JavaScript errors
                 window.location.href = userType === "admin" ? "admin.html" : "library.html";
             } else {
+                // DEBUG: Login failed - server returned error message
+                // DEBUG: Check server logs to see why authentication failed
+                // DEBUG: Verify database has user record matching email and student/employee number
                 showLoginError(data.error);
             }
         }

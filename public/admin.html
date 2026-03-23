@@ -7,6 +7,8 @@
 </head>
 <body>
 
+<!-- TOPBAR: User session info and logout button -->
+<!-- DEBUG: Check sessionStorage for currentUser if display is empty -->
 <div class="topbar">
     <div class="topbar-brand">
         <img src="logo.png" alt="Logo" class="topbar-logo">
@@ -16,50 +18,62 @@
         </div>
     </div>
     <div class="topbar-right">
+        <!-- DEBUG: If #userDisplay is empty, check if currentUser is set in app.js -->
         <p class="topbar-user" id="userDisplay"></p>
+        <!-- DEBUG: Verify downloadAuditLog() function exists in app.js -->
         <button onclick="downloadAuditLog()" id="auditBtn">&#8681; Audit Log</button>
         <button id="logoutBtn">Log Out</button>
     </div>
 </div>
 
-<!-- User Dashboard -->
+<!-- USER DASHBOARD SECTION -->
+<!-- DEBUG: If search returns no results, verify dbAll() query in server.js for users table -->
 <div class="box">
     <h2>User Dashboard</h2>
     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
         <input id="userSearchInput" placeholder="Search by name, email or student/employee number…" style="flex:1; min-width:220px; margin:0;">
+        <!-- DEBUG: Check browser console if searchUsers() fails - verify server endpoint /api/search-users -->
         <button onclick="searchUsers()">Search</button>
         <button onclick="openAddUserModal()" class="btn-outline">+ Add User</button>
     </div>
+    <!-- DEBUG: Results populate here. If empty, check Network tab for failed /api/search-users request -->
     <div id="userSearchResults"></div>
 </div>
 
-<!-- Books Table -->
+<!-- BOOKS TABLE SECTION -->
+<!-- DEBUG: If table is empty on load, verify loadBooks() in app.js and /api/books endpoint -->
 <div class="box">
     <h2>Available Books</h2>
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
         <input id="searchInput" placeholder="Search by title, author, category, dewey decimal…" style="flex:1; margin:0;">
         <button onclick="toggleBulkMode()" id="bulkToggleBtn" class="btn-outline">Select Bulk</button>
     </div>
-    <!-- Bulk action bar (hidden until bulk mode) -->
+    <!-- BULK ACTION BAR (hidden by default) -->
+    <!-- DEBUG: Check if this shows when "Select Bulk" is clicked - see toggleBulkMode() in app.js -->
+    <!-- DEBUG: Buttons should enable only when rows are selected (checked) -->
     <div id="bulkBar" class="bulk-bar" style="display:none;">
         <span id="bulkCount" class="bulk-count">0 selected</span>
+        <!-- DEBUG: If button doesn't work, verify openBulkEditModal() is defined -->
         <button onclick="openBulkEditModal()" class="btn-outline" id="bulkEditBtn" disabled>Bulk Edit</button>
+        <!-- DEBUG: Verify bulkDelete() makes correct DELETE requests to server -->
         <button onclick="bulkDelete()" class="btn-danger" id="bulkDeleteBtn" disabled>&#128465; Delete Selected</button>
         <button onclick="toggleBulkMode()" class="btn-ghost">Cancel</button>
     </div>
     <div id="paginationTop" class="pagination" style="margin-top:0; margin-bottom:8px;"></div>
+    <!-- DEBUG: Inspect #bookTable in DevTools to verify tbody has rows -->
+    <!-- DEBUG: If columns misalign, check style.css for table/colgroup styles -->
     <table id="bookTable">
         <colgroup>
             <col id="colBulk" style="display:none; width:36px;">
-            <col style="width:90px;">          <!-- ID -->
+            <col style="width:90px;">          <!-- ID (Book Code) -->
             <col>                              <!-- Title -->
             <col style="width:15%;">          <!-- Author -->
             <col style="width:62px;">         <!-- Year -->
             <col style="width:13%;">          <!-- Category -->
-            <col style="width:9%;">           <!-- Dewey -->
-            <col style="width:62px;">         <!-- Stock -->
-            <col style="width:100px;">        <!-- Status -->
-            <col style="width:110px;">        <!-- Actions -->
+            <col style="width:9%;">           <!-- Dewey Decimal -->
+            <col style="width:62px;">         <!-- Stock Quantity -->
+            <col style="width:100px;">        <!-- Availability Status -->
+            <col style="width:110px;">        <!-- Edit/Delete Actions -->
         </colgroup>
         <thead>
             <tr>
@@ -72,13 +86,17 @@
     <div id="pagination" class="pagination"></div>
 </div>
 
-<!-- Add / Edit Book -->
+<!-- ADD/EDIT BOOK FORM -->
+<!-- DEBUG: Form values are read by addBook()/editBook() in app.js - check browser console for errors -->
+<!-- DEBUG: For Edit, first select a book row from table above, then modify values and click "Edit Selected" -->
 <div class="box">
     <h2>Add / Edit Book</h2>
+    <!-- DEBUG: Verify addBook() sends POST to /api/books with correct format -->
     <input id="title" placeholder="Title">
     <input id="author" placeholder="Author">
     <input id="year" placeholder="Year" type="number">
     <div style="display:inline-block; width:calc(33.33% - 8px); margin:5px 5px 5px 0; position:relative;">
+        <!-- DEBUG: If category dropdown doesn't populate, check server /api/categories endpoint -->
         <select id="category" class="input-select" style="width:100%; margin:0;" onchange="onCategoryChange()">
             <option value="" disabled selected>Category</option>
             <option>Storybooks</option>
@@ -89,26 +107,32 @@
             <option value="__new__">+ New Category…</option>
         </select>
     </div>
+    <!-- DEBUG: This field appears only when "+ New Category…" is selected -->
     <input id="newCategoryInput" placeholder="New category name" style="display:none; width:calc(33.33% - 8px);">
     <input id="dewey_decimal" placeholder="Dewey Decimal">
     <input id="stock" placeholder="Stock" type="number" min="1" max="9999" value="1">
     <div style="margin-top:8px;">
+        <!-- DEBUG: If add fails, check /api/books POST endpoint in server.js -->
         <button onclick="addBook()">Add Book</button>
+        <!-- DEBUG: Select table row first. If nothing selected, check console for warning -->
         <button onclick="editBook()">Edit Selected</button>
         <button onclick="clearBookForm()" class="btn-ghost">Clear</button>
     </div>
 </div>
 
-<!-- Toast -->
+<!-- TOAST NOTIFICATIONS -->
+<!-- DEBUG: Messages appear here temporarily. Check app.js showToast() for message details -->
 <div id="toast" class="toast"></div>
 
-<!-- Bulk Edit Modal -->
+<!-- BULK EDIT MODAL -->
+<!-- DEBUG: Opens when "Bulk Edit" button clicked. Verifies multiple books can be updated at once -->
 <div id="bulkEditModal" class="modal-overlay" style="display:none;">
     <div class="modal-box" style="max-width:480px;">
         <div class="modal-header">
             <h3>Bulk Edit Books</h3>
             <button onclick="closeBulkEditModal()" class="modal-close">✕</button>
         </div>
+        <!-- DEBUG: Only non-empty fields are sent to server. Empty fields preserve existing values -->
         <p style="font-size:12px; color:#888; margin:8px 0 16px 0;">Only filled fields will be applied. Leave blank to keep existing values.</p>
         <div style="display:flex; flex-direction:column; gap:10px;">
             <div style="display:inline-block; width:100%;">
@@ -126,7 +150,9 @@
             <input id="bulkAuthor" placeholder="Author — leave blank to keep" style="width:100%; margin:0;">
             <input id="bulkDewey" placeholder="Dewey Decimal — leave blank to keep" style="width:100%; margin:0;">
             <input id="bulkStock" placeholder="Stock — leave blank to keep" type="number" min="1" max="9999" style="width:100%; margin:0;">
+            <!-- DEBUG: Error message displays here if validation fails -->
             <p id="bulkEditError" style="color:#e65100; font-size:12px; margin:0; display:none;"></p>
+            <!-- DEBUG: Verify submitBulkEdit() in app.js sends PATCH request to /api/books/bulk -->
             <button onclick="submitBulkEdit()" style="width:100%; margin:0;">Apply to Selected</button>
         </div>
     </div>
@@ -251,24 +277,41 @@
     </div>
 </div>
 
+<!-- LOAD EXTERNAL JAVASCRIPT -->
+<!-- DEBUG: If app.js is not found, check Network tab for 404 error -->
 <script src="app.js"></script>
-<script>
-    const storedUser = sessionStorage.getItem("currentUser");
-    if (!storedUser) { window.location.href = "index.html"; }
-    currentUser = JSON.parse(storedUser);
-    if (currentUser.role !== "admin") { window.location.href = "index.html"; }
 
+<!-- PAGE INITIALIZATION & AUTHORIZATION CHECK -->
+<script>
+    // DEBUG: Verify user is logged in and has admin role
+    const storedUser = sessionStorage.getItem("currentUser");
+    if (!storedUser) { 
+        // DEBUG: If redirecting to index.html, session expired - user needs to log in again
+        window.location.href = "index.html"; 
+    }
+    currentUser = JSON.parse(storedUser);
+    if (currentUser.role !== "admin") { 
+        // DEBUG: Non-admin users are redirected to index.html - check user role in database
+        window.location.href = "index.html"; 
+    }
+
+    // DEBUG: Display current logged-in user name
     document.getElementById("userDisplay").innerHTML =
         `Logged in as <strong>${currentUser.name}</strong>`;
+    
+    // DEBUG: Logout button - clears session and redirects to index.html
     document.getElementById("logoutBtn").addEventListener("click", logout);
 
+    // DEBUG: Load books on page init - if nothing appears, check /api/books endpoint
     loadBooks();
 
+    // DEBUG: Live filter books as user types - connected to renderTable() pagination
     document.getElementById("searchInput").addEventListener("input", () => {
-        currentPage = 1;
+        currentPage = 1;  // Reset to page 1 when searching
         renderTable();
     });
 
+    // DEBUG: User search - press Enter to trigger search
     document.getElementById("userSearchInput").addEventListener("keydown", e => {
         if (e.key === "Enter") searchUsers();
     });
