@@ -399,6 +399,12 @@ th {
 th:first-child { border-radius: 8px 0 0 0; }
 th:last-child  { border-radius: 0 8px 0 0; }
 
+#overdueFeesHeader {
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: unset;
+}
+
 /* Table rows — base */
 td {
     padding: 10px 10px;
