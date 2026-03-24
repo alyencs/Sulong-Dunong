@@ -7,6 +7,7 @@
 </head>
 <body>
 
+<!-- TOPBAR: User session info and logout button -->
 <div class="topbar">
     <div class="topbar-brand">
         <img src="logo.png" alt="Logo" class="topbar-logo">
@@ -17,12 +18,15 @@
     </div>
     <div class="topbar-right">
         <p class="topbar-user" id="userDisplay"></p>
+        <!-- Note: Logout clears session and returns to login page -->
         <button id="logoutBtn">Log Out</button>
     </div>
 </div>
 
+<!-- BOOKS TABLE: Searchable and sortable book inventory -->
 <div class="box">
     <h2>Available Books</h2>
+    <!-- Note: Search filters books in real-time as user types -->
     <input id="searchInput" placeholder="Search by title, author, category, dewey decimal…">
     <div id="sortTags" class="sort-tags"></div>
     <div id="paginationTop" class="pagination" style="margin-top:0; margin-bottom:8px;"></div>
@@ -54,8 +58,10 @@
     <div id="pagination" class="pagination"></div>
 </div>
 
+<!-- BORROW/RETURN SECTION: Book borrowing and return operations -->
 <div class="box">
     <h2>Borrow / Return</h2>
+    <!-- Note: Select a book row first, then click borrow/return buttons -->
     <button onclick="borrowBook()">Borrow Selected</button>
     <button onclick="showReturnPanel()">Return Selected</button>
 
@@ -130,26 +136,33 @@
 
 <script src="app.js"></script>
 <script>
+    // Note: Page initialization - verify user is logged in and has valid role
     const storedUser = sessionStorage.getItem("currentUser");
-    if (!storedUser) { window.location.href = "index.html"; }
+    if (!storedUser) { 
+        window.location.href = "index.html"; 
+    }
     currentUser = JSON.parse(storedUser);
-    if (currentUser.role !== "student" && currentUser.role !== "teacher") {
-        window.location.href = "index.html";
+    if (currentUser.role !== "student" && currentUser.role !== "teacher") { 
+        window.location.href = "index.html"; 
     }
 
+    // Note: Set portal label and display current logged-in user in topbar
     document.getElementById("portalLabel").textContent =
         currentUser.role === "teacher" ? "Teacher Library Portal" : "Student Library Portal";
     document.getElementById("userDisplay").innerHTML =
         `Logged in as <strong>${currentUser.name}</strong>`;
     document.getElementById("logoutBtn").addEventListener("click", logout);
 
+    // Note: Load books from /api/books endpoint on page initialization
     loadBooks();
 
+    // Note: Live search - resets pagination and re-renders table as user types
     document.getElementById("searchInput").addEventListener("input", () => {
         currentPage = 1;
         renderTable();
     });
 
+    // Note: Set up column sorting - click headers to sort table
     document.querySelectorAll("#bookTable th.sortable").forEach(th => {
         th.addEventListener("click", () => toggleSort(th.dataset.col));
     });

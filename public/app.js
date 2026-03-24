@@ -1,4 +1,8 @@
+// Note: Client-side application for book management and borrowing
+
 // ── Globals ────────────────────────────────────────────────────────────────
+
+// Note: Global state - selectedBookCode, currentUser, allBooks, pagination, sorting, bulk mode
 let selectedBookCode = null;
 let currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
 let allBooks = [];
@@ -12,6 +16,7 @@ let myBorrowedCodes = new Set();
 
 // ── Books: Load ────────────────────────────────────────────────────────────
 
+// Note: Load all books and user's borrowed books from API
 async function loadBooks() {
     const [booksRes, myBorrowsRes] = await Promise.all([
         fetch("/books"),
@@ -28,6 +33,7 @@ async function loadBooks() {
 
 // ── Books: Filter & Sort ───────────────────────────────────────────────────
 
+// Note: Search books across title, author, category, dewey, and code (case-insensitive)
 function getFilteredBooks() {
     const query = (document.getElementById("searchInput")?.value || "").toLowerCase();
     if (!query) return [...allBooks];
@@ -37,6 +43,7 @@ function getFilteredBooks() {
     );
 }
 
+// Note: Sort books by multiple criteria - handles strings and numbers appropriately
 function getSortedBooks(books) {
     if (!sortState.length) return books;
     return [...books].sort((a, b) => {
@@ -238,6 +245,7 @@ function toggleSelectedBook(book_code) {
 
 // ── Borrow ─────────────────────────────────────────────────────────────────
 
+// Note: Borrow selected book - validates selection, availability, and creates 7-day due date
 async function borrowBook() {
     if (!selectedBookCode) return showInfo("No Book Selected", "Please select a book from the table first.");
     const book = allBooks.find(b => b.book_code === selectedBookCode);
@@ -930,6 +938,7 @@ async function bulkDelete() {
 
 // ── UI Utilities ───────────────────────────────────────────────────────────
 
+// Note: Toast (temporary), Info (modal), and Confirm (modal) user feedback functions
 let _toastTimer = null;
 function showToast(message, duration = 3000) {
     const toast = document.getElementById("toast");

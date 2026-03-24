@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* =====================================================
-   TYPE SCALE
+/* TYPE SCALE
    --font-size-xs:   11px  — labels, badges, table headers
    --font-size-sm:   12px  — secondary text, captions
    --font-size-base: 13px  — body text, table rows
@@ -9,11 +8,9 @@
    --font-size-lg:   15px  — section headings (box h2)
    --font-size-xl:   17px  — topbar brand name
    --font-size-2xl:  30px  — login page heading
-   ===================================================== */
+*/
 
-/* =====================================================
-   LOGIN PAGE (index.html)
-   ===================================================== */
+/* LOGIN PAGE (index.html) */
 
 body.login-page {
     font-family: 'Inter', sans-serif;
@@ -203,11 +200,7 @@ body.login-page {
     transform: translateX(-50%) translateY(0);
 }
 
-
-/* =====================================================
-   APP PAGES (library.html / admin.html)
-   ===================================================== */
-
+/* APP PAGES (library.html / admin.html) */
 body {
     font-family: 'Inter', sans-serif;
     background: #3B1A0A;
@@ -381,6 +374,8 @@ table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: 
 /* Status badge cells — don't clip */
 #bookTable td:nth-child(9),
 #bookTable.library-table td:nth-child(7) { white-space: normal; overflow: visible; text-overflow: unset; }
+
+/* TABLE SECTION */
 th {
     background: #1B1B1B;
     color: #fff;
@@ -554,9 +549,7 @@ button.btn-danger {
 
 .borrowed-by-link:hover { text-decoration: underline; }
 
-/* =====================================================
-   MODALS
-   ===================================================== */
+/* MODALS: Overlay and box styling with animations */
 
 .modal-overlay {
     position: fixed;

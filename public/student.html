@@ -6,6 +6,7 @@
 </head>
 <body>
 
+<!-- TOPBAR: User session info and logout button -->
 <div class="topbar">
     <div class="topbar-brand">
         <img src="logo.png" alt="Logo" class="topbar-logo">
@@ -16,12 +17,15 @@
     </div>
     <div class="topbar-right">
         <p class="topbar-user" id="userDisplay"></p>
+        <!-- Note: Logout clears session and returns to login page -->
         <button id="logoutBtn">Log Out</button>
     </div>
 </div>
 
+<!-- BOOKS TABLE: Simple searchable book inventory (no pagination/sorting) -->
 <div class="box">
     <h2>Available Books</h2>
+    <!-- Note: Live search filters books as user types -->
     <input id="searchInput" placeholder="Search by title, author, category, dewey decimal…">
     <table id="bookTable">
         <thead>
@@ -33,12 +37,14 @@
     </table>
 </div>
 
+<!-- BORROW/RETURN SECTION: Book borrowing and return operations -->
 <div class="box">
     <h2>Borrow / Return</h2>
+    <!-- Note: Select a book row first, then click borrow/return buttons -->
     <button onclick="borrowBook()">Borrow Selected</button>
     <button onclick="showReturnPanel()">Return Selected</button>
 
-    <!-- Return date panel -->
+    <!-- Return panel for date selection -->
     <div id="returnPanel" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #f2f2f2;">
         <p style="font-size:13px; color:#555; margin:0 0 10px 0;">
             Enter the date you are returning <strong id="returningBookCode"></strong>:
@@ -52,7 +58,7 @@
     </div>
 </div>
 
-<!-- Fees section -->
+<!-- FEES SECTION: Overdue fees table (shown only if user has fees) -->
 <div class="box" id="feesSection" style="display:none;">
     <h2>Overdue Fees</h2>
     <table>
@@ -71,22 +77,29 @@
 
 <script src="app.js"></script>
 <script>
+    // Note: Page initialization - verify user is logged in and has valid role
     const storedUser = sessionStorage.getItem("currentUser");
-    if (!storedUser) { alert("Please login"); window.location.href = "index.html"; }
+    if (!storedUser) { 
+        alert("Please login"); 
+        window.location.href = "index.html"; 
+    }
     currentUser = JSON.parse(storedUser);
-    if (currentUser.role !== "student" && currentUser.role !== "teacher") {
+    if (currentUser.role !== "student" && currentUser.role !== "teacher") { 
         alert("Access denied");
-        window.location.href = "index.html";
+        window.location.href = "index.html"; 
     }
 
+    // Note: Set portal label and display current logged-in user in topbar
     document.getElementById("portalLabel").textContent =
         currentUser.role === "teacher" ? "Teacher Library Portal" : "Student Library Portal";
     document.getElementById("userDisplay").innerHTML =
         `Logged in as <strong>${currentUser.name}</strong>`;
-
     document.getElementById("logoutBtn").addEventListener("click", logout);
+
+    // Note: Load books from /api/books endpoint - uses client-side filtering
     loadBooks();
 
+    // Note: Live search - filters table as user types (client-side, case-insensitive)
     document.getElementById("searchInput").addEventListener("input", () => {
         const query = document.getElementById("searchInput").value.toLowerCase();
         document.querySelectorAll("#bookTable tbody tr").forEach(row => {

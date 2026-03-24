@@ -7,6 +7,7 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Note: Load environment variables from .env file
 try {
   readFileSync(".env", "utf8").split("\n").forEach(line => {
     const [k, ...rest] = line.split("=");
@@ -14,6 +15,7 @@ try {
   });
 } catch {}
 
+// Note: Configuration - requires TURSO_URL and TURSO_AUTH_TOKEN in .env
 const SCHOOL_DOMAIN = process.env.SCHOOL_EMAIL_DOMAIN || "school.edu.ph";
 const PORT = process.env.PORT || 3000;
 const FEE_PER_DAY = 20;
@@ -23,13 +25,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Note: Database connection using Turso client
 const db = createClient({
   url: process.env.TURSO_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// ── DB helpers (libsql compat) ────────────────────────────────────────────
-
+// Note: Database helper functions - dbRun for writes, dbGet/dbAll for reads
 async function dbRun(sql, args = []) {
   return db.execute({ sql, args });
 }
@@ -44,8 +46,7 @@ async function dbAll(sql, args = []) {
   return res.rows;
 }
 
-// ── Schema ─────────────────────────────────────────────────────────────────
-
+// Note: Schema creation with migrations for safe updates
 await dbRun(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_type TEXT NOT NULL,
@@ -250,6 +251,7 @@ app.get("/config", (req, res) => res.json({ emailDomain: SCHOOL_DOMAIN }));
 
 // ── Auth ───────────────────────────────────────────────────────────────────
 
+// Note: Login validates user type, email domain, and banned status
 app.post("/login", async (req, res) => {
   const { user_type, student_number, employee_number, email } = req.body;
   if (!user_type || !email) return res.status(400).json({ error: "Missing fields" });
