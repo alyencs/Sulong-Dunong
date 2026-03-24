@@ -84,6 +84,19 @@
     </table>
 </div>
 
+<!-- Borrow Success Modal -->
+<div id="borrowSuccessModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+            <h3>Book Borrowed!</h3>
+        </div>
+        <div id="borrowSuccessBody" style="font-size:13px; color:#555; margin:12px 0 0 0;"></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+            <button onclick="document.getElementById('borrowSuccessModal').style.display='none'">OK</button>
+        </div>
+    </div>
+</div>
+
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 

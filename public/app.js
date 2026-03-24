@@ -254,7 +254,18 @@ async function borrowBook() {
     });
     const data = await res.json();
     if (!res.ok) return showInfo("Cannot Borrow", data.error);
-    showToast(`Borrowed! Due: ${dueDate.toLocaleDateString()}`);
+    const modal = document.getElementById("borrowSuccessModal");
+    if (modal) {
+        document.getElementById("borrowSuccessBody").innerHTML =
+            `You have successfully borrowed <strong>${book.title}</strong>.<br><br>
+             <strong>Author:</strong> ${book.author}<br>
+             <strong>Book ID:</strong> ${book.book_code}<br>
+             <strong>Borrowed:</strong> ${new Date().toLocaleDateString()}<br>
+             <strong>Due Date:</strong> ${dueDate.toLocaleDateString()}`;
+        modal.style.display = "flex";
+    } else {
+        showToast(`Borrowed! Due: ${dueDate.toLocaleDateString()}`);
+    }
     loadBooks();
 }
 
@@ -753,29 +764,43 @@ function toggleBulkMode() {
     const bar = document.getElementById("bulkBar");
     const btn = document.getElementById("bulkToggleBtn");
     const checkAllTh = document.getElementById("bulkCheckAllTh");
-    const cols = document.querySelectorAll("#bookTable colgroup col");
-    // col indices: 0=bulk, 1=ID, 2=Title, 3=Author, 4=Year, 5=Category, 6=Dewey, 7=Stock, 8=Status, 9=Actions
-    const stockTh = document.querySelector("#bookTable thead th:nth-child(9)");  // Stock th (after bulk col shown)
-    const actionsTh = document.querySelector("#bookTable thead th:last-child");
 
     if (bulkMode) {
         bar.style.display = "flex";
         btn.style.display = "none";
         if (checkAllTh) checkAllTh.style.display = "";
-        if (cols[7]) cols[7].style.display = "none";
-        if (cols[9]) cols[9].style.display = "none";
         document.getElementById("thStock").style.display = "none";
         document.getElementById("thActions").style.display = "none";
+        document.querySelector("#bookTable colgroup").innerHTML = `
+            <col style="width:36px;">
+            <col style="width:90px;">
+            <col>
+            <col style="width:15%;">
+            <col style="width:62px;">
+            <col style="width:13%;">
+            <col style="width:9%;">
+            <col style="width:100px;">
+        `;
     } else {
         bar.style.display = "none";
         btn.style.display = "";
         if (checkAllTh) checkAllTh.style.display = "none";
         const checkAll = document.getElementById("checkAll");
         if (checkAll) checkAll.checked = false;
-        if (cols[7]) cols[7].style.display = "";
-        if (cols[9]) cols[9].style.display = "";
         document.getElementById("thStock").style.display = "";
         document.getElementById("thActions").style.display = "";
+        document.querySelector("#bookTable colgroup").innerHTML = `
+            <col id="colBulk" style="display:none; width:36px;">
+            <col style="width:90px;">
+            <col>
+            <col style="width:15%;">
+            <col style="width:62px;">
+            <col style="width:13%;">
+            <col style="width:9%;">
+            <col style="width:62px;">
+            <col style="width:100px;">
+            <col style="width:110px;">
+        `;
     }
     updateBulkBar();
     renderTable();

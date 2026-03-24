@@ -22,6 +22,7 @@
         <p class="topbar-user" id="userDisplay"></p>
         <!-- DEBUG: Verify downloadAuditLog() function exists in app.js -->
         <button onclick="downloadAuditLog()" id="auditBtn">&#8681; Audit Log</button>
+        <button id="resetDbBtn" onclick="handleResetDb()">Reset Database</button>
         <button id="logoutBtn">Log Out</button>
     </div>
 </div>
@@ -209,9 +210,17 @@
         </div>
         <div class="modal-section" style="margin-top:12px;">
             <table id="borrowersTable">
+                <colgroup>
+                    <col style="width:110px;">   <!-- Number -->
+                    <col>                        <!-- Email (takes remaining space) -->
+                    <col style="width:90px;">    <!-- Borrowed -->
+                    <col style="width:90px;">    <!-- Due Date -->
+                    <col style="width:100px;">    <!-- Overdue Fee -->
+                    <col style="width:40px;">    <!-- Action -->
+                </colgroup>
                 <thead>
                     <tr>
-                        <th>Number</th><th>Email</th><th>Borrowed</th><th>Due Date</th><th>Overdue Fee</th><th></th>
+                        <th>Number</th><th>Email</th><th>Borrowed</th><th>Due Date</th><th>Overdue Fees</th><th></th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -301,6 +310,31 @@
     
     // DEBUG: Logout button - clears session and redirects to index.html
     document.getElementById("logoutBtn").addEventListener("click", logout);
+
+    let _resetConfirming = false;
+    let _resetTimer = null;
+    function handleResetDb() {
+        const btn = document.getElementById("resetDbBtn");
+        if (!_resetConfirming) {
+            _resetConfirming = true;
+            btn.textContent = "Are you sure?";
+            btn.classList.add("btn-reset-confirm");
+            _resetTimer = setTimeout(() => {
+                _resetConfirming = false;
+                btn.textContent = "Reset Database";
+                btn.classList.remove("btn-reset-confirm");
+            }, 4000);
+        } else {
+            clearTimeout(_resetTimer);
+            _resetConfirming = false;
+            btn.textContent = "Reset Database";
+            btn.classList.remove("btn-reset-confirm");
+            fetch("/reset-database", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actor_id: currentUser.id, actor_name: currentUser.name }) })
+                .then(r => r.json())
+                .then(() => { showToast("Database reset to default."); loadBooks(); })
+                .catch(() => showToast("Reset failed."));
+        }
+    }
 
     // DEBUG: Load books on page init - if nothing appears, check /api/books endpoint
     loadBooks();

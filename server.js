@@ -488,6 +488,94 @@ app.post("/users", async (req, res) => {
   res.json(newUser);
 });
 
+// ── Reset Database ──────────────────────────────────────────────────────
+
+app.post("/reset-database", async (req, res) => {
+  const { actor_id, actor_name } = req.body;
+  await dbRun("DELETE FROM borrow_records");
+  await dbRun("DELETE FROM audit_log");
+  await dbRun("DELETE FROM books");
+  await dbRun("DELETE FROM users");
+  await dbRun("DELETE FROM sqlite_sequence WHERE name IN ('users','borrow_records','audit_log')");
+  await dbRun(`
+  INSERT INTO books (book_code, title, author, year, category, stock, available, dewey_decimal) VALUES
+  ('SB-001', 'Noli Me Tángere', 'José Rizal', 1887, 'Storybooks', 7, 7, '899.211'),
+  ('SB-002', 'Ilustrado', 'Miguel Syjuco', 2008, 'Storybooks', 12, 12, '823.92'),
+  ('SB-003', 'Alamat ng Ampalaya', 'Augie Rivera', 1997, 'Storybooks', 5, 5, '899.211'),
+  ('SB-004', 'Florante at Laura', 'Francisco Balagtas', 1838, 'Storybooks', 9, 9, '899.211'),
+  ('SB-005', 'Dekada ''70', 'Lualhati Bautista', 1983, 'Storybooks', 6, 6, '899.211'),
+  ('SB-006', 'The Little Prince', 'Antoine de Saint-Exupéry', 1943, 'Storybooks', 14, 14, '843'),
+  ('SB-007', 'Harry Potter and the Sorcerer''s Stone', 'J.K. Rowling', 1997, 'Storybooks', 11, 11, '823.914'),
+  ('SB-008', 'To Kill a Mockingbird', 'Harper Lee', 1960, 'Storybooks', 4, 4, '813.54'),
+  ('SB-009', '1984', 'George Orwell', 1949, 'Storybooks', 8, 8, '823.912'),
+  ('SB-010', 'Animal Farm', 'George Orwell', 1945, 'Storybooks', 10, 10, '823.912'),
+  ('RM-001', 'Merriam-Webster''s Dictionary', 'Merriam-Webster', 1843, 'Reference Materials', 3, 3, '423'),
+  ('RM-002', 'Encyclopædia Britannica', 'Encyclopaedia Britannica', 1910, 'Reference Materials', 13, 13, '030'),
+  ('RM-003', 'The World Almanac', 'Sarah Janssen', 2024, 'Reference Materials', 6, 6, '030'),
+  ('RM-004', 'Oxford English Dictionary', 'Oxford University Press', 1884, 'Reference Materials', 9, 9, '423'),
+  ('RM-005', 'Gray''s Anatomy', 'Henry Gray', 1858, 'Reference Materials', 5, 5, '611'),
+  ('RM-006', 'Roget''s Thesaurus', 'Peter Mark Roget', 1852, 'Reference Materials', 7, 7, '423.1'),
+  ('RM-007', 'CIA World Factbook', 'CIA', 2023, 'Reference Materials', 12, 12, '910'),
+  ('BE-001', 'Closing the Vocabulary Gap', 'Alex Quigley', 2018, 'Basic Education', 8, 8, '372.44'),
+  ('BE-002', 'Liberating Learning', 'Santiago Rincón-Gallardo', 2019, 'Basic Education', 6, 6, '371.2'),
+  ('BE-003', 'Teaching Computing', 'William Lau', 2017, 'Basic Education', 10, 10, '371.33'),
+  ('BE-004', 'How Children Learn', 'John Holt', 1967, 'Basic Education', 4, 4, '370.15'),
+  ('BE-005', 'The First Days of School', 'Harry K. Wong', 1998, 'Basic Education', 11, 11, '371.102'),
+  ('BE-006', 'Visible Learning', 'John Hattie', 2008, 'Basic Education', 7, 7, '370.72'),
+  ('BE-007', 'Teach Like a Champion', 'Doug Lemov', 2010, 'Basic Education', 9, 9, '371.102'),
+  ('BT-001', 'Learn to Code with Scratch', 'Raspberry Pi Foundation', 2016, 'Basic Technology', 13, 13, '005.13'),
+  ('BT-002', 'Discrete Mathematics', 'Oscar Levin', 2018, 'Basic Technology', 5, 5, '511'),
+  ('BT-003', 'Data Science at the Command Line', 'Jeroen Janssens', 2021, 'Basic Technology', 6, 6, '005.7'),
+  ('BT-004', 'Clean Code', 'Robert C. Martin', 2008, 'Basic Technology', 14, 14, '005.1'),
+  ('BT-005', 'Introduction to Algorithms', 'Thomas H. Cormen', 2009, 'Basic Technology', 12, 12, '005.1'),
+  ('BT-006', 'The Pragmatic Programmer', 'Andrew Hunt', 1999, 'Basic Technology', 8, 8, '005.1'),
+  ('BT-007', 'Computer Networking Basics', 'Kurose & Ross', 2017, 'Basic Technology', 7, 7, '004.6'),
+  ('BT-008', 'Python Crash Course', 'Eric Matthes', 2019, 'Basic Technology', 9, 9, '005.13'),
+  ('CM-001', 'The Mythology Class', 'Arnold Arre', 1999, 'Cultural Materials', 4, 4, '741.5959'),
+  ('CM-002', 'Filipino Children''s Favorite Stories', 'Liana Romulo', 2020, 'Cultural Materials', 6, 6, '398.2'),
+  ('CM-003', 'Philippine Folk Literature', 'Damiana L. Eugenio', 2002, 'Cultural Materials', 5, 5, '398.2'),
+  ('CM-004', 'Culture and History of the Philippines', 'Nick Joaquin', 1988, 'Cultural Materials', 11, 11, '959.9'),
+  ('CM-005', 'Barangay', 'William Henry Scott', 1994, 'Cultural Materials', 8, 8, '959.9'),
+  ('CM-006', 'Philippine Mythology', 'Maximo Ramos', 1990, 'Cultural Materials', 10, 10, '398.2'),
+  ('SC-001', 'A Brief History of Time', 'Stephen Hawking', 1988, 'Science', 9, 9, '523.1'),
+  ('SC-002', 'The Selfish Gene', 'Richard Dawkins', 1976, 'Science', 6, 6, '576.5'),
+  ('SC-003', 'Cosmos', 'Carl Sagan', 1980, 'Science', 12, 12, '520'),
+  ('SC-004', 'The Origin of Species', 'Charles Darwin', 1859, 'Science', 7, 7, '575'),
+  ('SC-005', 'Silent Spring', 'Rachel Carson', 1962, 'Science', 5, 5, '363.7'),
+  ('SC-006', 'Astrophysics for People in a Hurry', 'Neil deGrasse Tyson', 2017, 'Science', 8, 8, '523'),
+  ('HI-001', 'Sapiens', 'Yuval Noah Harari', 2011, 'History', 13, 13, '909'),
+  ('HI-002', 'Guns, Germs, and Steel', 'Jared Diamond', 1997, 'History', 10, 10, '303.4'),
+  ('HI-003', 'The Philippines: A Past Revisited', 'Renato Constantino', 1975, 'History', 6, 6, '959.9'),
+  ('HI-004', 'A People''s History of the United States', 'Howard Zinn', 1980, 'History', 4, 4, '973'),
+  ('HI-005', 'The Second World War', 'Antony Beevor', 2012, 'History', 9, 9, '940.53'),
+  ('PH-001', 'Meditations', 'Marcus Aurelius', 180, 'Philosophy', 7, 7, '188'),
+  ('PH-002', 'The Republic', 'Plato', 380, 'Philosophy', 5, 5, '321'),
+  ('PH-003', 'Beyond Good and Evil', 'Friedrich Nietzsche', 1886, 'Philosophy', 8, 8, '193'),
+  ('PH-004', 'Critique of Pure Reason', 'Immanuel Kant', 1781, 'Philosophy', 6, 6, '121'),
+  ('PH-005', 'The Art of War', 'Sun Tzu', 500, 'Philosophy', 11, 11, '355.02')
+  `);
+  await dbRun(`
+  INSERT INTO users (user_type, name, student_number, employee_number, email) VALUES
+  ('student', 'Juan Dela Cruz', 'S10101', NULL, 'juan.dela.cruz@school.edu.ph'),
+  ('student', 'Maria Santos', 'S10102', NULL, 'maria.santos@school.edu.ph'),
+  ('student', 'Jose Reyes', 'S10103', NULL, 'jose.reyes@school.edu.ph'),
+  ('student', 'Ana Garcia', 'S10104', NULL, 'ana.garcia@school.edu.ph'),
+  ('student', 'Carlo Mendoza', 'S10105', NULL, 'carlo.mendoza@school.edu.ph'),
+  ('teacher', 'Ricardo Villanueva', NULL, 'T10101', 'ricardo.villanueva@school.edu.ph'),
+  ('teacher', 'Linda Aquino', NULL, 'T10102', 'linda.aquino@school.edu.ph'),
+  ('teacher', 'Ernesto Bautista', NULL, 'T10103', 'ernesto.bautista@school.edu.ph'),
+  ('teacher', 'Susana Castillo', NULL, 'T10104', 'susana.castillo@school.edu.ph'),
+  ('teacher', 'Danilo Flores', NULL, 'T10105', 'danilo.flores@school.edu.ph'),
+  ('admin', 'Rosario Lim', NULL, 'E10201', 'rosario.lim@school.edu.ph'),
+  ('admin', 'Fernando Cruz', NULL, 'E10202', 'fernando.cruz@school.edu.ph'),
+  ('admin', 'Gloria Ramos', NULL, 'E10203', 'gloria.ramos@school.edu.ph'),
+  ('admin', 'Benito Torres', NULL, 'E10204', 'benito.torres@school.edu.ph'),
+  ('admin', 'Carmen Navarro', NULL, 'E10205', 'carmen.navarro@school.edu.ph')
+  `);
+  await logAction(actor_id, actor_name, "RESET_DATABASE", "Database reset to default seed data");
+  res.json({ success: true });
+});
+
 // ── Audit Log ────────────────────────────────────────────────────────────
 
 app.get("/audit-log", async (req, res) => {
